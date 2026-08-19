@@ -239,32 +239,202 @@ function AuthPanel({ onAuth }) {
 }
 
 function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracking }) {
-  const [form, setForm] = useState({ name: user.name, contact: user.phone || '+91 98765 43210', emergencyType: 'Cardiac', priority: 'Critical' });
+  const [form, setForm] = useState({
+    name: user.name,
+    contact: user.phone || '+91 98765 43210',
+    emergencyType: 'Cardiac',
+    priority: 'Critical'
+  });
+
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+
   const active = requests[0];
 
   const submit = async (event) => {
     event.preventDefault();
-    const { data } = await api.post('/api/requests', form);
-    mergeRequest(data.request);
+
+    try {
+      // Book ambulance
+      const { data } = await api.post('/api/requests', form);
+
+      mergeRequest(data.request);
+
+      // Get AI hospital recommendations
+      setLoadingRecommendations(true);
+
+      const response = await api.post('/api/hospitals/recommend', {
+        emergencyType: form.emergencyType,
+        priority: form.priority
+      });
+
+      setRecommendations(response.data.recommendations || []);
+
+    } catch (error) {
+      console.error('Booking / AI recommendation error:', error);
+    } finally {
+      setLoadingRecommendations(false);
+    }
   };
 
   return (
     <section className="dashboard">
-      <Header title={`Welcome, ${user.name}`} subtitle="Book an ambulance and watch the dispatch system react in real time." icon={<HeartPulse />} />
+      <Header
+        title={`Welcome, ${user.name}`}
+        subtitle="Book an ambulance and watch the dispatch system react in real time."
+        icon={<HeartPulse />}
+      />
+
       <NcrIntel />
+
       <RealisticOps request={active} />
+
       <div className="grid two">
+
         <form className="panel rise" onSubmit={submit}>
           <h2>Emergency Booking</h2>
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Patient name" />
-          <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Contact" />
-          <select value={form.emergencyType} onChange={(e) => setForm({ ...form, emergencyType: e.target.value })}>{emergencyTypes.map((type) => <option key={type}>{type}</option>)}</select>
-          <div className="segmented">{priorities.map((item) => <button type="button" className={form.priority === item ? 'active' : ''} onClick={() => setForm({ ...form, priority: item })} key={item}>{item}</button>)}</div>
-          <button className="emergency"><Siren /> Request Ambulance</button>
+
+          <input
+            value={form.name}
+            onChange={(e) =>
+              setForm({ ...form, name: e.target.value })
+            }
+            placeholder="Patient name"
+          />
+
+          <input
+            value={form.contact}
+            onChange={(e) =>
+              setForm({ ...form, contact: e.target.value })
+            }
+            placeholder="Contact"
+          />
+
+          <select
+            value={form.emergencyType}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                emergencyType: e.target.value
+              })
+            }
+          >
+            {emergencyTypes.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+
+          <div className="segmented">
+            {priorities.map((item) => (
+              <button
+                type="button"
+                className={form.priority === item ? 'active' : ''}
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    priority: item
+                  })
+                }
+                key={item}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <button className="emergency">
+            <Siren />
+            Request Ambulance
+          </button>
         </form>
+
         <StatusPanel request={active} />
+
       </div>
-      <MapAndHospitals request={active} hospitals={hospitals} tracking={tracking} />
+
+      {/* AI HOSPITAL RECOMMENDATIONS */}
+      <AiHospitalRecommendations
+        recommendations={recommendations}
+        loading={loadingRecommendations}
+      />
+
+      <MapAndHospitals
+        request={active}
+        hospitals={hospitals}
+        tracking={tracking}
+      />
+
+    </section>
+  );
+}
+function AiHospitalRecommendations({ recommendations, loading }) {
+  return (
+    <section className="panel rise ai-recommendations">
+
+      <div className="section-title">
+        <h2>🧠 AI Hospital Recommendation</h2>
+        <span>ML-powered suitability ranking</span>
+      </div>
+
+      {loading && (
+        <p className="muted">
+          Analyzing hospital capacity and suitability...
+        </p>
+      )}
+
+      {!loading && recommendations.length === 0 && (
+        <p className="muted">
+          Book an ambulance to generate AI hospital recommendations.
+        </p>
+      )}
+
+      {!loading && recommendations.length > 0 && (
+        <div className="ai-hospital-list">
+
+          {recommendations.map((hospital, index) => (
+            <article
+              className={`ai-hospital ${
+                index === 0 ? 'top-hospital' : ''
+              }`}
+              key={hospital.name}
+            >
+
+              <div className="hospital-rank">
+                {index === 0
+                  ? '🥇'
+                  : index === 1
+                    ? '🥈'
+                    : index === 2
+                      ? '🥉'
+                      : `#${index + 1}`}
+              </div>
+
+              <div className="hospital-info">
+                <strong>{hospital.name}</strong>
+
+                <span>
+                  {hospital.distance_km} km
+                  {' • '}
+                  {hospital.beds} beds
+                  {' • '}
+                  {hospital.icu_beds} ICU beds
+                </span>
+              </div>
+
+              <div className="hospital-score">
+                <strong>
+                  {hospital.suitability_score}%
+                </strong>
+
+                <span>Suitability</span>
+              </div>
+
+            </article>
+          ))}
+
+        </div>
+      )}
+
     </section>
   );
 }

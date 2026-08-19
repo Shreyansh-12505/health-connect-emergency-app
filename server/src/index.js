@@ -90,7 +90,72 @@ app.get('/api/me', requireAuth, async (req, res) => {
 app.get('/api/hospitals', requireAuth, async (_req, res) => {
   res.json(await getHospitals());
 });
+app.post('/api/hospitals/recommend', requireAuth, async (req, res) => {
+  try {
+    const hospitals = await getHospitals();
 
+    console.log("HOSPITALS FROM STORE:", hospitals);
+
+    const mlHospitals = hospitals.map((hospital) => ({
+      name: hospital.name,
+
+      distance_km: parseFloat(
+        String(hospital.distance).replace(' km', '')
+      ),
+
+      beds: Number(hospital.beds),
+
+      icu_beds: Number(hospital.icu),
+
+      trauma: hospital.trauma ? 1 : 0,
+
+      emergency_match: 1,
+
+      priority:
+        req.body.priority === 'Critical'
+          ? 3
+          : req.body.priority === 'Moderate'
+            ? 2
+            : 1
+    }));
+
+    console.log("DATA SENT TO ML:", mlHospitals);
+
+    const response = await fetch(
+      'http://127.0.0.1:8000/recommend-hospitals',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          hospitals: mlHospitals
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error('ML service error:', errorText);
+
+      return res.status(502).json({
+        message: 'ML recommendation service unavailable'
+      });
+    }
+
+    const recommendations = await response.json();
+
+    res.json(recommendations);
+
+  } catch (error) {
+    console.error('Hospital recommendation error:', error);
+
+    res.status(500).json({
+      message: 'Failed to get hospital recommendations'
+    });
+  }
+});
 app.get('/api/requests', requireAuth, async (req, res) => {
   res.json(await listRequestsForUser(req.user));
 });
