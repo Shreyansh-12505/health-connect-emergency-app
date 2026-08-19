@@ -21,3 +21,6 @@ server.err.log
 .DS_Store
 Thumbs.db
 .codex-write-test
+
+__pycache__/
+*.pyc
