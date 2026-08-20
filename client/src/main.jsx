@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import axios from 'axios';
 import { io } from 'socket.io-client';
@@ -74,14 +74,47 @@ function Scene() {
 }
 
 function useSocket(token, onEvent) {
+  const onEventRef = useRef(onEvent);
+
   useEffect(() => {
-    if (!token) return undefined;
-    const socket = io(API, { auth: { token } });
-    socket.on('request:new', (data) => onEvent('request:new', data));
-    socket.on('request:update', (data) => onEvent('request:update', data));
-    socket.on('tracking:update', (data) => onEvent('tracking:update', data));
-    return () => socket.disconnect();
-  }, [token, onEvent]);
+    onEventRef.current = onEvent;
+  }, [onEvent]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = io(API, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+    });
+
+    socket.on('request:new', (data) => {
+      onEventRef.current('request:new', data);
+    });
+
+    socket.on('request:update', (data) => {
+      onEventRef.current('request:update', data);
+    });
+
+    socket.on('tracking:update', (data) => {
+      onEventRef.current('tracking:update', data);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token]);
 }
 
 function App() {
