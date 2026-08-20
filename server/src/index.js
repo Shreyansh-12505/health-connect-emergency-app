@@ -120,9 +120,10 @@ app.post('/api/hospitals/recommend', requireAuth, async (req, res) => {
     }));
 
     console.log("DATA SENT TO ML:", mlHospitals);
+const ML_URL = process.env.ML_URL || 'http://127.0.0.1:8000';
 
     const response = await fetch(
-      'http://127.0.0.1:8000/recommend-hospitals',
+      `${ML_URL}/recommend-hospitals`,
       {
         method: 'POST',
         headers: {
