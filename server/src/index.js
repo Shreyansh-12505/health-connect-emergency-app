@@ -21,14 +21,24 @@ import {
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 8080;
-const CLIENT_URLS = (process.env.CLIENT_URL || 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',')
-  .map((url) => url.trim())
-  .filter(Boolean);
-const JWT_SECRET = process.env.JWT_SECRET || 'healthcare-connect-demo-secret';
-const isAllowedOrigin = (origin) => !origin || CLIENT_URLS.includes(origin) || /\.vercel\.app$/.test(origin) || /\.netlify\.app$/.test(origin);
+const CLIENT_URLS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://health-connect-emergency-1zdlljttd.vercel.app'
+];
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  return CLIENT_URLS.includes(origin) ||
+    /\.vercel\.app$/.test(origin);
+};
+
 const corsOrigin = (origin, callback) => {
-  if (isAllowedOrigin(origin)) return callback(null, true);
+  if (isAllowedOrigin(origin)) {
+    return callback(null, true);
+  }
+
   return callback(new Error(`CORS blocked origin: ${origin}`));
 };
 
