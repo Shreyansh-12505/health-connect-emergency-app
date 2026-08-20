@@ -30,8 +30,10 @@ const CLIENT_URLS = [
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
-  return CLIENT_URLS.includes(origin) ||
-    /\.vercel\.app$/.test(origin);
+  return (
+    CLIENT_URLS.includes(origin) ||
+    /^https:\/\/.*\.vercel\.app$/.test(origin)
+  );
 };
 
 const corsOrigin = (origin, callback) => {
@@ -43,12 +45,23 @@ const corsOrigin = (origin, callback) => {
 };
 
 const io = new Server(server, {
-  cors: { origin: corsOrigin, credentials: true }
+  cors: {
+    origin: corsOrigin,
+    credentials: true
+  }
 });
+
 const trackingTimers = new Map();
 
-app.use(cors({ origin: corsOrigin, credentials: true }));
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true
+  })
+);
 app.use(express.json());
+const JWT_SECRET =
+  process.env.JWT_SECRET || 'healthcare-connect-demo-secret';
 
 function publicUser(user) {
   const { password, ...safe } = user;
