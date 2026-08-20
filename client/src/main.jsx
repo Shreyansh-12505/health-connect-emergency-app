@@ -84,12 +84,12 @@ function useSocket(token, onEvent) {
     if (!token) return;
 
     const socket = io(API, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
+  auth: { token },
+  transports: ['polling'],
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
+});
 
     socket.on('connect', () => {
       console.log('Socket connected:', socket.id);
