@@ -313,7 +313,7 @@ function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracki
   return (
     <section className="dashboard">
       <Header
-        title={`Welcome, ${user.name}`}
+        title={`Welcome`}
         subtitle="Book an ambulance and watch the dispatch system react in real time."
         icon={<HeartPulse />}
       />
