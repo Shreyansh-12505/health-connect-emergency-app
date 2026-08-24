@@ -10,6 +10,7 @@ import {
   createUser,
   findUserByEmail,
   getDriverByUser,
+  getDriverEarnings,
   getHospitals,
   initStore,
   listOnlineDrivers,
@@ -206,12 +207,37 @@ app.patch('/api/driver/status', requireAuth, async (req, res) => {
   res.json(driver);
 });
 
+app.get('/api/driver/earnings', requireAuth, async (req, res) => {
+  if (req.user.role !== 'driver') return res.status(403).json({ message: 'Drivers only' });
+  try {
+    res.json(await getDriverEarnings(req.user.id));
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || 'Could not load driver earnings' });
+  }
+});
+
 app.patch('/api/requests/:id/status', requireAuth, async (req, res) => {
-  const request = await updateRequestStatus(req.params.id, req.body.status, req.user.role === 'driver' ? req.user.id : null);
-  io.to('drivers').emit('request:update', request);
-  io.to(`patient:${request.patientId}`).emit('request:update', request);
-  if (request.status === 'Accepted') startTracking(request);
-  res.json(request);
+  try {
+    const result = await updateRequestStatus(
+      req.params.id,
+      req.body.status,
+      req.user.role === 'driver' ? req.user.id : null,
+      { reason: req.body.reason }
+    );
+    const { request, driver, transaction } = result;
+    io.to('drivers').emit('request:update', request);
+    io.to(`patient:${request.patientId}`).emit('request:update', request);
+    if (driver && transaction) {
+      io.to(`driver:${req.user.id}`).emit('driver:wallet:update', {
+        driver,
+        transaction
+      });
+    }
+    if (request.status === 'Accepted') startTracking(request);
+    res.json(request);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || 'Could not update ride status' });
+  }
 });
 
 function startTracking(request) {
@@ -252,6 +278,7 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   if (socket.user.role === 'driver') socket.join('drivers');
+  if (socket.user.role === 'driver') socket.join(`driver:${socket.user.id}`);
   socket.join(`patient:${socket.user.id}`);
 
   socket.on('tracking:tick', (payload) => {

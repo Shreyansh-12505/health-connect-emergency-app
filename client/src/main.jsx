@@ -4,7 +4,7 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import gsap from 'gsap';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Activity, Ambulance, Bell, Building2, CheckCircle2, Clock, Crosshair, Expand, Gauge, HeartPulse, Hospital, LogOut, MapPin, MapPinned, Navigation, PhoneCall, Radio, Route, ShieldCheck, Siren, Sparkles, Stethoscope, UserRound, X, Zap } from 'lucide-react';
+import { Activity, Ambulance, Bell, Building2, CheckCircle2, Clock, Coins, Crosshair, Expand, Gauge, HeartPulse, Hospital, IndianRupee, LogOut, MapPin, MapPinned, Medal, Navigation, PhoneCall, Radio, Route, ShieldCheck, Siren, Sparkles, Star, Stethoscope, Trophy, UserRound, X, Zap } from 'lucide-react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -13,6 +13,7 @@ import './styles.css';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const priorities = ['Critical', 'Moderate', 'Normal'];
 const emergencyTypes = ['Cardiac', 'Accident', 'Stroke', 'Respiratory', 'Pregnancy', 'Other'];
+const rejectReasons = ['Already with a patient', 'Currently unavailable', 'Vehicle unavailable', 'Too far', 'Other'];
 const ncrZones = [
   { name: 'South Delhi', load: 'High', eta: '4 min', color: '#ef4444' },
   { name: 'Noida Expressway', load: 'Rising', eta: '6 min', color: '#f59e0b' },
@@ -111,6 +112,10 @@ function useSocket(token, onEvent) {
       onEventRef.current('tracking:update', data);
     });
 
+    socket.on('driver:wallet:update', (data) => {
+      onEventRef.current('driver:wallet:update', data);
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -122,12 +127,16 @@ function App() {
   const [requests, setRequests] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [driver, setDriver] = useState(session?.driver || null);
+  const [driverEarnings, setDriverEarnings] = useState(null);
   const [toast, setToast] = useState('');
   const [tracking, setTracking] = useState(null);
   const api = useMemo(() => axios.create({ baseURL: API, headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {} }), [session]);
 
   const mergeRequest = (incoming) => {
     setRequests((items) => {
+      if (session?.user?.role === 'driver' && driver?.id && incoming.rejectedDrivers?.includes(driver.id)) {
+        return items.filter((item) => item.id !== incoming.id);
+      }
       const rest = items.filter((item) => item.id !== incoming.id);
       return [incoming, ...rest].sort((a, b) => ({ Critical: 3, Moderate: 2, Normal: 1 }[b.priority] || 0) - ({ Critical: 3, Moderate: 2, Normal: 1 }[a.priority] || 0));
     });
@@ -137,6 +146,14 @@ function App() {
     if (event.includes('request')) {
       mergeRequest(data);
       setToast(event === 'request:new' ? 'New emergency request received' : `Request marked ${data.status}`);
+    }
+    if (event === 'driver:wallet:update') {
+      setDriver(data.driver);
+      setDriverEarnings((old) => ({
+        driver: data.driver,
+        transactions: data.transaction ? [data.transaction, ...(old?.transactions || [])].slice(0, 5) : old?.transactions || []
+      }));
+      setToast(`Ride completed. Payment added: ₹${data.transaction?.amount || 0}`);
     }
     if (event === 'tracking:update') setTracking(data);
   });
@@ -153,6 +170,9 @@ function App() {
       setRequests(reqs.data);
       setHospitals(hosps.data);
       setDriver(me.data.driver);
+      if (me.data.user.role === 'driver') {
+        api.get('/api/driver/earnings').then(({ data }) => setDriverEarnings(data));
+      }
     });
   }, [api, session]);
 
@@ -173,6 +193,7 @@ function App() {
     setSession(null);
     setRequests([]);
     setDriver(null);
+    setDriverEarnings(null);
   };
 
   return (
@@ -184,7 +205,7 @@ function App() {
         <div className="brand"><Siren size={22} /> Healthcare Emergency Connect</div>
         {session && <button className="ghost" onClick={logout}><LogOut size={16} /> Logout</button>}
       </nav>
-      {!session ? <Landing onAuth={saveSession} /> : session.user.role === 'driver' ? <DriverDashboard api={api} user={session.user} driver={driver} setDriver={setDriver} requests={requests} mergeRequest={mergeRequest} hospitals={hospitals} /> : <PatientDashboard api={api} user={session.user} requests={requests} mergeRequest={mergeRequest} hospitals={hospitals} tracking={tracking} />}
+      {!session ? <Landing onAuth={saveSession} /> : session.user.role === 'driver' ? <DriverDashboard api={api} user={session.user} driver={driver} setDriver={setDriver} driverEarnings={driverEarnings} requests={requests} mergeRequest={mergeRequest} hospitals={hospitals} /> : <PatientDashboard api={api} user={session.user} requests={requests} mergeRequest={mergeRequest} hospitals={hospitals} tracking={tracking} />}
       {toast && <div className="toast"><Bell size={16} /> {toast}</div>}
     </main>
   );
@@ -472,30 +493,36 @@ function AiHospitalRecommendations({ recommendations, loading }) {
   );
 }
 
-function DriverDashboard({ api, user, driver, setDriver, requests, mergeRequest, hospitals }) {
+function DriverDashboard({ api, user, driver, setDriver, driverEarnings, requests, mergeRequest, hospitals }) {
   const active = requests.find((req) => req.status === 'Accepted') || requests[0];
+  const [requestReasons, setRequestReasons] = useState({});
+  const walletDriver = driverEarnings?.driver || driver;
   const changeStatus = async () => {
     const { data } = await api.patch('/api/driver/status', { status: driver?.status === 'ONLINE' ? 'OFFLINE' : 'ONLINE' });
     setDriver(data);
   };
-  const setRequestStatus = async (id, status) => {
-    const { data } = await api.patch(`/api/requests/${id}/status`, { status });
+  const setRequestStatus = async (id, status, reason) => {
+    const { data } = await api.patch(`/api/requests/${id}/status`, { status, reason });
     mergeRequest(data);
   };
 
   return (
-    <section className="dashboard">
+      <section className="dashboard">
       <Header title="Driver Command Center" subtitle="Accept the highest priority case and keep availability visible." icon={<Ambulance />} />
       <NcrIntel />
       <RealisticOps request={active} driverView />
+      <MapAndHospitals request={active} hospitals={hospitals} />
       <div className="grid driver-grid">
-        <div className="panel rise">
-          <h2>{driver?.name || user.name}</h2>
-          <Info icon={<ShieldCheck />} label="License" value={driver?.licenseNumber} />
-          <Info icon={<Ambulance />} label="Vehicle" value={driver?.vehicleNumber} />
-          <Info icon={<UserRound />} label="Phone" value={driver?.phone} />
-          <button className={`availability ${driver?.status === 'ONLINE' ? 'online' : ''}`} onClick={changeStatus}>{driver?.status || 'OFFLINE'}</button>
-          <div className="mini-stats"><Metric value={requests.filter((r) => r.status === 'Accepted').length} label="Active" /><Metric value={driver?.completed || 0} label="Completed" /></div>
+        <div className="driver-side">
+          <div className="panel rise">
+            <h2>{driver?.name || user.name}</h2>
+            <Info icon={<ShieldCheck />} label="License" value={driver?.licenseNumber} />
+            <Info icon={<Ambulance />} label="Vehicle" value={driver?.vehicleNumber} />
+            <Info icon={<UserRound />} label="Phone" value={driver?.phone} />
+            <button className={`availability ${driver?.status === 'ONLINE' ? 'online' : ''}`} onClick={changeStatus}>{driver?.status || 'OFFLINE'}</button>
+            <div className="mini-stats"><Metric value={requests.filter((r) => r.status === 'Accepted').length} label="Active" /><Metric value={driver?.completed || 0} label="Completed" /></div>
+          </div>
+          <DriverEarningsPanel driver={walletDriver} transactions={driverEarnings?.transactions || []} />
         </div>
         <div className="panel rise requests">
           <h2>Incoming Requests</h2>
@@ -506,18 +533,51 @@ function DriverDashboard({ api, user, driver, setDriver, requests, mergeRequest,
                 <strong>{request.patientName}</strong>
                 <span>{request.emergencyType} - {request.region || 'Delhi NCR'} - {request.distance} - ETA {request.eta} min</span>
               </div>
-              <b>{request.priority}</b>
+              <b>{request.status}</b>
               <div className="actions">
-                <button onClick={() => setRequestStatus(request.id, 'Accepted')}>Accept</button>
-                <button className="ghost" onClick={() => setRequestStatus(request.id, 'Rejected')}>Reject</button>
+                {request.status === 'Pending' && <button onClick={() => setRequestStatus(request.id, 'Accepted')}>Accept</button>}
+                {request.status === 'Pending' && (
+                  <>
+                    <select className="reject-select" value={requestReasons[request.id] || 'Already with a patient'} onChange={(event) => setRequestReasons({ ...requestReasons, [request.id]: event.target.value })}>
+                      {rejectReasons.map((reason) => <option key={reason}>{reason}</option>)}
+                    </select>
+                    <button className="ghost" onClick={() => setRequestStatus(request.id, 'Rejected', requestReasons[request.id] || 'Already with a patient')}>Reject</button>
+                  </>
+                )}
                 {request.status === 'Accepted' && <button onClick={() => setRequestStatus(request.id, 'Completed')}>Complete</button>}
+                {request.status === 'Completed' && <span className="paid-chip">Paid ₹{request.driverEarning || 0} / +{request.rewardPointsEarned || 0} pts</span>}
               </div>
             </article>
           ))}
         </div>
       </div>
-      <MapAndHospitals request={active} hospitals={hospitals} />
     </section>
+  );
+}
+
+function DriverEarningsPanel({ driver, transactions }) {
+  return (
+    <div className="panel rise earnings-panel">
+      <div className="section-title"><h2>Driver Earnings</h2><span><IndianRupee size={15} /> Simulated wallet</span></div>
+      <div className="earnings-grid">
+        <Info icon={<Coins />} label="Total Earnings" value={`₹${driver?.totalEarnings || 0}`} />
+        <Info icon={<Ambulance />} label="Completed Rides" value={driver?.completedRides ?? driver?.completed ?? 0} />
+        <Info icon={<Star />} label="Performance" value="Reliable" />
+        <Info icon={<Trophy />} label="Service Points" value={driver?.servicePoints || 0} />
+        <Info icon={<Medal />} label="Driver Level" value={driver?.level || 'Bronze Responder'} />
+      </div>
+      <div className="transactions">
+        <strong>Recent transactions</strong>
+        {transactions.length === 0 && <p className="muted">Completed ride earnings will appear here.</p>}
+        {transactions.map((item) => (
+          <article key={item.id}>
+            <span>Ride #{String(item.rideId).slice(-5)}</span>
+            <b>₹{item.amount}</b>
+            <small>+{item.servicePoints} Service Points</small>
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -607,6 +667,8 @@ function StatusPanel({ request }) {
           <Info icon={<Clock />} label="ETA" value={`${request.eta} minutes`} />
           <Info icon={<MapPin />} label="Region" value={request.region || request.distance} />
           <Info icon={<Activity />} label="Priority" value={request.priority} />
+          {request.driverName && <Info icon={<Ambulance />} label="Driver" value={`${request.driverName} (${request.vehicleNumber || 'Ambulance'})`} />}
+          {request.status === 'Completed' && <Info icon={<IndianRupee />} label="Final Fare" value={`₹${request.fare || 0} - ${request.paymentStatus || 'Paid'}`} />}
         </>
       )}
     </div>
