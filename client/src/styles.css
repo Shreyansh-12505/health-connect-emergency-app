@@ -302,6 +302,24 @@ select option { background: #eef9ff; }
 .hospitals article { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(14,165,233,.1); }
 .hospitals svg { color: #0284c7; }
 .hospitals b { color: #047857; }
+.schemes-panel { margin-top: 22px; }
+.schemes-heading { display: flex; align-items: flex-start; gap: 12px; }
+.schemes-heading > svg { flex: 0 0 auto; margin-top: 3px; color: #0284c7; }
+.schemes-heading h2 { margin: 0; }
+.schemes-heading p { margin: 6px 0 0; max-width: 760px; color: #607789; font-size: .94rem; font-weight: 500; }
+.scheme-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.scheme-card { min-width: 0; padding: 18px; border: 1px solid rgba(14,165,233,.16); border-radius: 18px; background: rgba(255,255,255,.76); }
+.scheme-title { display: flex; align-items: flex-start; gap: 10px; }
+.scheme-title svg { flex: 0 0 auto; color: #0284c7; }
+.scheme-title h3 { margin: 0; color: #123042; font-size: 1.02rem; line-height: 1.35; }
+.scheme-card > p { color: #607789; line-height: 1.5; }
+.scheme-card dl { margin: 14px 0; }
+.scheme-card dl > div + div { margin-top: 11px; }
+.scheme-card dt { color: #123042; font-weight: 800; font-size: .88rem; }
+.scheme-card dd { margin: 3px 0 0; color: #526a79; line-height: 1.48; font-size: .91rem; }
+.scheme-link { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 13px; border-radius: 11px; background: #e0f2fe; color: #075985; font-weight: 800; text-decoration: none; }
+.scheme-link:hover, .scheme-link:focus-visible { background: #bae6fd; text-decoration: underline; }
+.scheme-disclaimer { margin: 16px 0 0; padding: 12px 14px; border-left: 3px solid #f59e0b; border-radius: 8px; background: #fffbeb; color: #604b1c; font-size: .9rem; line-height: 1.5; }
 .toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; background: rgba(255,255,255,.82); color: #123042; border: 1px solid rgba(14,165,233,.22); border-radius: 14px; padding: 13px 16px; box-shadow: 0 16px 44px rgba(30,64,105,.18); backdrop-filter: blur(18px); }
 @keyframes drift {
   from { transform: translate3d(0, 0, 0) scale(1); }
@@ -321,6 +339,7 @@ select option { background: #eef9ff; }
 }
 @media (max-width: 1050px) {
   .landing, .two, .driver-grid { grid-template-columns: 1fr; }
+  .scheme-grid { grid-template-columns: 1fr; }
   .intel-grid { grid-template-columns: repeat(2, 1fr); }
   .ops-grid { grid-template-columns: repeat(2, 1fr); }
   .intel-card.wide { grid-column: 1 / -1; }

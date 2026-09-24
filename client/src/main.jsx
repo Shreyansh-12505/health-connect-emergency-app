@@ -4,7 +4,7 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import gsap from 'gsap';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Activity, Ambulance, Bell, Building2, CheckCircle2, Clock, Coins, Crosshair, Expand, Gauge, HeartPulse, Hospital, IndianRupee, LogOut, MapPin, MapPinned, Medal, Navigation, PhoneCall, Radio, Route, ShieldCheck, Siren, Sparkles, Star, Stethoscope, Trophy, UserRound, X, Zap } from 'lucide-react';
+import { Activity, Ambulance, Bell, Building2, CheckCircle2, Clock, Coins, Crosshair, Expand, ExternalLink, Gauge, HeartPulse, Hospital, IndianRupee, LogOut, MapPin, MapPinned, Medal, Navigation, PhoneCall, Radio, Route, ShieldCheck, Siren, Sparkles, Star, Stethoscope, Trophy, UserRound, X, Zap } from 'lucide-react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -14,16 +14,16 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const priorities = ['Critical', 'Moderate', 'Normal'];
 const emergencyTypes = ['Cardiac', 'Accident', 'Stroke', 'Respiratory', 'Pregnancy', 'Other'];
 const rejectReasons = ['Already with a patient', 'Currently unavailable', 'Vehicle unavailable', 'Too far', 'Other'];
-const ncrZones = [
-  { name: 'South Delhi', load: 'High', eta: '4 min', color: '#ef4444' },
-  { name: 'Noida Expressway', load: 'Rising', eta: '6 min', color: '#f59e0b' },
-  { name: 'Gurugram Cyber City', load: 'Stable', eta: '8 min', color: '#06b6d4' },
-  { name: 'Dwarka-Airport', load: 'Clear', eta: '5 min', color: '#22c55e' }
+const maharashtraZones = [
+  { name: 'Pune', load: 'Demo coverage', eta: '4 min', color: '#ef4444' },
+  { name: 'Mumbai', load: 'Demo coverage', eta: '6 min', color: '#f59e0b' },
+  { name: 'Nagpur', load: 'Demo coverage', eta: '8 min', color: '#06b6d4' },
+  { name: 'Chhatrapati Sambhajinagar', load: 'Demo coverage', eta: '5 min', color: '#22c55e' }
 ];
 const fleetStats = [
-  { icon: <Ambulance />, value: '28', label: 'NCR ambulances live' },
+  { icon: <Ambulance />, value: '28', label: 'Maharashtra ambulances (demo)' },
   { icon: <Gauge />, value: '92%', label: 'Dispatch confidence' },
-  { icon: <Hospital />, value: '74', label: 'Beds visible now' },
+  { icon: <Hospital />, value: '74', label: 'Demo bed records' },
   { icon: <Zap />, value: '1.2s', label: 'Realtime sync' }
 ];
 const responseSteps = [
@@ -33,14 +33,40 @@ const responseSteps = [
   { label: 'Family contact notified', time: '00:42', done: false }
 ];
 const fleetUnits = [
-  { code: 'DL-ALS-2047', crew: 'Rohan + EMT Kavya', zone: 'South Delhi', eta: '4 min', type: 'ALS' },
-  { code: 'UP-BLS-1182', crew: 'Noida Rapid Unit', zone: 'Noida Sec 18', eta: '6 min', type: 'BLS' },
-  { code: 'HR-ICU-4309', crew: 'Gurugram ICU Van', zone: 'Cyber City', eta: '8 min', type: 'ICU' }
+  { code: 'MH-ALS-2047', crew: 'Pune Rapid Unit', zone: 'Pune', eta: '4 min', type: 'ALS' },
+  { code: 'MH-BLS-1182', crew: 'Mumbai Rapid Unit', zone: 'Mumbai', eta: '6 min', type: 'BLS' },
+  { code: 'MH-ICU-4309', crew: 'Nagpur ICU Unit', zone: 'Nagpur', eta: '8 min', type: 'ICU' }
 ];
 const triageSignals = [
   { label: 'Pulse', value: '118 bpm', tone: 'critical' },
   { label: 'SpO2', value: '91%', tone: 'moderate' },
   { label: 'BP', value: '142/94', tone: 'normal' }
+];
+const healthcareSchemes = [
+  {
+    id: 'mjpjy', name: 'Mahatma Jyotirao Phule Jan Arogya Yojana (MJPJAY)', icon: <ShieldCheck />,
+    description: 'Maharashtra’s state health assurance scheme supports eligible residents for listed treatments at participating hospitals.',
+    eligibility: 'Eligibility depends on current state rules and beneficiary records. Check the official portal or call the scheme helpline.',
+    benefits: 'Cashless treatment for covered procedures at empanelled hospitals, subject to scheme package rules and verification.',
+    apply: 'Ask the hospital Arogya Mitra/help desk to check your beneficiary status and required documents. Helpline: 155388.',
+    url: 'https://www.jeevandayee.gov.in/MJPJAY/index.jsp', label: 'MJPJAY official portal'
+  },
+  {
+    id: 'pmjay', name: 'Ayushman Bharat – PM-JAY', icon: <Hospital />,
+    description: 'Government-funded health cover for verified eligible beneficiary families, with portability at empanelled hospitals.',
+    eligibility: 'For households in the official beneficiary database; all people aged 70 or older can enrol regardless of income. Verify before relying on cover.',
+    benefits: 'Up to ₹5 lakh per year for eligible families; senior-citizen coverage follows the official PM-JAY rules.',
+    apply: 'Check at beneficiary.nha.gov.in, use the Ayushman App, visit a Common Service Centre or ask an empanelled hospital. Helpline: 14555.',
+    url: 'https://beneficiary.nha.gov.in/', label: 'Check PM-JAY eligibility'
+  },
+  {
+    id: 'jssk', name: 'Janani Shishu Suraksha Karyakram (JSSK)', icon: <HeartPulse />,
+    description: 'Public-facility entitlements for pregnant women and sick infants, including transport support under programme rules.',
+    eligibility: 'Pregnant women delivering at public health institutions, and sick newborns/infants seeking care at public facilities.',
+    benefits: 'Includes free delivery and related medicines, diagnostics, blood, diet and eligible transport/referral services.',
+    apply: 'Contact the nearest government health facility or ASHA/ANM. Maharashtra lists 102 for JSSK referral transport (service exceptions may apply).',
+    url: 'https://www.nhm.gov.in/index4.php?lang=1&level=0&lid=171&linkid=150', label: 'JSSK details (NHM)'
+  }
 ];
 
 const marker = (label, color) =>
@@ -217,21 +243,21 @@ function Landing({ onAuth }) {
       <div className="hero-copy rise">
         <span className="pill"><Radio size={14} /> Real-time emergency dispatch</span>
         <h1>Patient requests. Driver accepts. Ambulance moves live.</h1>
-        <p>A Delhi NCR emergency response cockpit with driver dispatch, live ambulance movement, hospital capacity, and priority routing in one polished demo.</p>
+        <p>A Maharashtra emergency response cockpit with driver dispatch, live ambulance movement, hospital capacity, and priority routing in one polished demo.</p>
         <div className="metrics">
           <Metric value="4 min" label="Critical ETA" />
           <Metric value="Live" label="Socket.io updates" />
-          <Metric value="5" label="NCR hospital feeds" />
+          <Metric value="5" label="Maharashtra hospital feeds" />
         </div>
         <div className="city-strip">
-          {ncrZones.map((zone) => <span key={zone.name} style={{ '--zone': zone.color }}>{zone.name}</span>)}
+          {maharashtraZones.map((zone) => <span key={zone.name} style={{ '--zone': zone.color }}>{zone.name}</span>)}
         </div>
       </div>
       <div className="hero-visual rise">
         <Canvas camera={{ position: [0, 0, 4] }}><Scene /></Canvas>
-        <div className="signal-card"><Activity /> Delhi NCR network armed</div>
-        <div className="float-card float-a"><Navigation size={16} /> AIIMS corridor</div>
-        <div className="float-card float-b"><Route size={16} /> Noida route clean</div>
+        <div className="signal-card"><Activity /> Maharashtra network armed (demo)</div>
+        <div className="float-card float-a"><Navigation size={16} /> Sassoon Hospital corridor</div>
+        <div className="float-card float-b"><Route size={16} /> Maharashtra route demo</div>
       </div>
       <AuthPanel onAuth={onAuth} />
     </section>
@@ -302,6 +328,7 @@ function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracki
 
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [hasSubmittedRequest, setHasSubmittedRequest] = useState(false);
 
   const active = requests[0];
 
@@ -313,6 +340,7 @@ function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracki
       const { data } = await api.post('/api/requests', form);
 
       mergeRequest(data.request);
+      setHasSubmittedRequest(true);
 
       // Get AI hospital recommendations
       setLoadingRecommendations(true);
@@ -412,6 +440,8 @@ function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracki
         loading={loadingRecommendations}
       />
 
+      {hasSubmittedRequest && <GovernmentHealthcareSchemes emergencyType={form.emergencyType} />}
+
       <MapAndHospitals
         request={active}
         hospitals={hospitals}
@@ -421,13 +451,46 @@ function PatientDashboard({ api, user, requests, mergeRequest, hospitals, tracki
     </section>
   );
 }
+
+function GovernmentHealthcareSchemes({ emergencyType }) {
+  const orderedSchemes = emergencyType === 'Pregnancy'
+    ? [...healthcareSchemes].sort((a, b) => (a.id === 'jssk' ? -1 : b.id === 'jssk' ? 1 : 0))
+    : healthcareSchemes;
+
+  return (
+    <section className="panel rise schemes-panel" aria-labelledby="schemes-heading">
+      <div className="section-title">
+        <div className="schemes-heading"><ShieldCheck aria-hidden="true" /><div><h2 id="schemes-heading">Government Healthcare Schemes &amp; Financial Assistance</h2><p>Potential support options for Maharashtra residents. Suggestions are based on your selected emergency type; eligibility is not verified.</p></div></div>
+        <span>Official-source information</span>
+      </div>
+      <div className="scheme-grid">
+        {orderedSchemes.map((scheme) => (
+          <article className="scheme-card" key={scheme.id}>
+            <div className="scheme-title">{scheme.icon}<h3>{scheme.name}</h3></div>
+            <p>{scheme.description}</p>
+            <dl>
+              <div><dt>Who may qualify</dt><dd>{scheme.eligibility}</dd></div>
+              <div><dt>Possible benefit</dt><dd>{scheme.benefits}</dd></div>
+              <div><dt>How to apply</dt><dd>{scheme.apply}</dd></div>
+            </dl>
+            <a className="scheme-link" href={scheme.url} target="_blank" rel="noopener noreferrer" aria-label={`${scheme.label} (opens in a new tab)`}>
+              Learn More <ExternalLink size={15} aria-hidden="true" />
+            </a>
+          </article>
+        ))}
+      </div>
+      <p className="scheme-disclaimer">Disclaimer: This is general information, not an eligibility decision or guarantee of payment. Scheme rules, covered treatments and benefits can change. Verify current eligibility, hospital participation and benefits with the official source or hospital scheme desk.</p>
+    </section>
+  );
+}
+
 function AiHospitalRecommendations({ recommendations, loading }) {
   return (
     <section className="panel rise ai-recommendations">
 
       <div className="section-title">
         <h2>🧠 AI Hospital Recommendation</h2>
-        <span>ML-powered suitability ranking</span>
+        <span>ML-ranked demo data · distances measured from Pune demo origin</span>
       </div>
 
       {loading && (
@@ -531,7 +594,7 @@ function DriverDashboard({ api, user, driver, setDriver, driverEarnings, request
             <article className={`request-card ${request.priority.toLowerCase()}`} key={request.id}>
               <div>
                 <strong>{request.patientName}</strong>
-                <span>{request.emergencyType} - {request.region || 'Delhi NCR'} - {request.distance} - ETA {request.eta} min</span>
+                <span>{request.emergencyType} - {request.region || 'Maharashtra'} - {request.distance} - ETA {request.eta} min</span>
               </div>
               <b>{request.status}</b>
               <div className="actions">
@@ -597,8 +660,8 @@ function NcrIntel() {
       ))}
       <article className="intel-card wide">
         <div><Sparkles /></div>
-        <strong>AIIMS Trauma Centre recommended</strong>
-        <span>Fastest route from South Delhi with ICU and trauma capacity available.</span>
+        <strong>Sassoon General Hospital recommended</strong>
+        <span>Sample route from Pune with demo ICU and trauma capacity information.</span>
         <div className="pulse-line"><span /><span /><span /></div>
       </article>
     </div>
@@ -642,7 +705,7 @@ function RealisticOps({ request, driverView = false }) {
             </div>
           ))}
         </div>
-        <p className="microcopy">{request ? `${request.priority} ${request.emergencyType} case routed via ${request.region || 'Delhi NCR'}.` : 'Triage summary activates after booking.'}</p>
+        <p className="microcopy">{request ? `${request.priority} ${request.emergencyType} case routed via ${request.region || 'Maharashtra'}.` : 'Triage summary activates after booking.'}</p>
       </section>
       <section className="panel ops-card contact-card">
         <div className="section-title"><h2>Notifications</h2><span><PhoneCall size={15} /> Mock alerts</span></div>
@@ -688,7 +751,7 @@ function MapResizer({ active }) {
 
 function DispatchMap({ patient, driver, hospitals, expanded = false }) {
   return (
-    <MapContainer key={expanded ? 'expanded-map' : 'compact-map'} center={[28.58, 77.22]} zoom={expanded ? 11 : 10} scrollWheelZoom={expanded}>
+    <MapContainer key={expanded ? 'expanded-map' : 'compact-map'} center={[19.3, 75.2]} zoom={expanded ? 6 : 5} scrollWheelZoom={expanded}>
       <MapResizer active={expanded} />
       <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Marker position={[patient.lat, patient.lng]} icon={marker('P', '#22c55e')} />
@@ -703,8 +766,8 @@ function DispatchMap({ patient, driver, hospitals, expanded = false }) {
 
 function MapAndHospitals({ request, hospitals, tracking }) {
   const [expanded, setExpanded] = useState(false);
-  const patient = request?.patientLocation || { lat: 28.6239, lng: 77.218 };
-  const driver = tracking?.driverLocation || request?.driverLocation || { lat: 28.6139, lng: 77.209 };
+  const patient = request?.patientLocation || { lat: 18.52, lng: 73.856 };
+  const driver = tracking?.driverLocation || request?.driverLocation || { lat: 18.528, lng: 73.865 };
 
   useEffect(() => {
     if (!expanded) return undefined;
@@ -722,8 +785,8 @@ function MapAndHospitals({ request, hospitals, tracking }) {
   return (
     <div className="grid two lower">
       <div className="panel map-wrap rise">
-        <div className="section-title"><h2>Delhi NCR Live Tracking</h2><span><MapPinned size={15} /> Delhi - Noida - Gurugram</span></div>
-        <button className="map-click-layer" type="button" onClick={() => setExpanded(true)} aria-label="Expand Delhi NCR map">
+        <div className="section-title"><h2>Maharashtra Live Tracking</h2><span><MapPinned size={15} /> Pune - Mumbai - Nagpur</span></div>
+        <button className="map-click-layer" type="button" onClick={() => setExpanded(true)} aria-label="Expand Maharashtra map">
           <span><Expand size={16} /> Click to expand command map</span>
         </button>
         <DispatchMap patient={patient} driver={driver} hospitals={hospitals} />
@@ -732,8 +795,8 @@ function MapAndHospitals({ request, hospitals, tracking }) {
             <div className="map-modal-panel" onMouseDown={(event) => event.stopPropagation()}>
               <div className="modal-head">
                 <div>
-                  <h2>Delhi NCR Command Map</h2>
-                  <p>Expanded route view with ambulance, patient, hospitals, and NCR coverage points.</p>
+                  <h2>Maharashtra Command Map</h2>
+                  <p>Expanded route view with ambulance, patient, hospitals, and Maharashtra coverage points.</p>
                 </div>
                 <button className="ghost close-map" type="button" onClick={() => setExpanded(false)}><X size={18} /> Close</button>
               </div>
@@ -749,11 +812,11 @@ function MapAndHospitals({ request, hospitals, tracking }) {
         )}
       </div>
       <div className="panel rise hospitals">
-        <div className="section-title"><h2>Hospital Availability</h2><span><Crosshair size={15} /> Live fake NCR data</span></div>
+        <div className="section-title"><h2>Hospital Availability</h2><span><Crosshair size={15} /> Demo hospital data; confirm availability</span></div>
         {hospitals.map((hospital) => (
           <article key={hospital.id}>
             {hospital.trauma ? <Hospital /> : <Building2 />}
-            <div><strong>{hospital.name}</strong><span>{hospital.region} - {hospital.distance} away - ICU {hospital.icu}</span></div>
+            <div><strong>{hospital.name}</strong><span>{hospital.region} - approx. {hospital.distance} from Pune demo origin - ICU {hospital.icu}</span></div>
             <b>{hospital.beds} beds</b>
           </article>
         ))}
