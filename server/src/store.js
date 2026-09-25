@@ -10,15 +10,15 @@ const dataDir = path.resolve(__dirname, '../data');
 const dataFile = path.join(dataDir, 'db.json');
 
 const hospitalSeed = [
-  { id: 'hosp-aiims', name: 'AIIMS Trauma Centre, Delhi', distance: '2.1 km', beds: 14, icu: 5, trauma: true, region: 'South Delhi', location: { lat: 28.5672, lng: 77.21 } },
-  { id: 'hosp-max-saket', name: 'Max Super Speciality, Saket', distance: '4.7 km', beds: 9, icu: 3, trauma: true, region: 'Saket', location: { lat: 28.5276, lng: 77.2128 } },
-  { id: 'hosp-fortis-noida', name: 'Fortis Hospital, Noida', distance: '8.4 km', beds: 18, icu: 6, trauma: true, region: 'Noida Sector 62', location: { lat: 28.6181, lng: 77.3726 } },
-  { id: 'hosp-medanta', name: 'Medanta The Medicity, Gurugram', distance: '18.2 km', beds: 22, icu: 8, trauma: true, region: 'Gurugram', location: { lat: 28.4399, lng: 77.0419 } },
-  { id: 'hosp-yatharth', name: 'Yatharth Hospital, Greater Noida', distance: '24.8 km', beds: 11, icu: 4, trauma: false, region: 'Greater Noida', location: { lat: 28.4744, lng: 77.503 } }
+  { id: 'hosp-sassoon', name: 'B. J. Government Medical College & Sassoon General Hospitals', distance: '2.1 km', beds: 14, icu: 5, trauma: true, region: 'Pune', location: { lat: 18.5196, lng: 73.876 } },
+  { id: 'hosp-kem', name: 'King Edward Memorial Hospital', distance: '119 km', beds: 9, icu: 3, trauma: true, region: 'Parel, Mumbai', location: { lat: 19.001, lng: 72.842 } },
+  { id: 'hosp-jj', name: 'Sir J. J. Group of Hospitals', distance: '118 km', beds: 18, icu: 6, trauma: true, region: 'Byculla, Mumbai', location: { lat: 18.963, lng: 72.833 } },
+  { id: 'hosp-gmch-nagpur', name: 'Government Medical College & Hospital, Nagpur', distance: '621 km', beds: 22, icu: 8, trauma: true, region: 'Nagpur', location: { lat: 21.15, lng: 79.09 } },
+  { id: 'hosp-gmch-sambhajinagar', name: 'Government Medical College & Hospital, Chhatrapati Sambhajinagar', distance: '216 km', beds: 11, icu: 4, trauma: false, region: 'Chhatrapati Sambhajinagar', location: { lat: 19.876, lng: 75.343 } }
 ];
 
-const driverLocation = { lat: 28.5843, lng: 77.1639 };
-const patientLocation = { lat: 28.5672, lng: 77.21 };
+const driverLocation = { lat: 18.528, lng: 73.865 };
+const patientLocation = { lat: 18.52, lng: 73.856 };
 const fareConfig = {
   baseFare: Number(process.env.BASE_FARE || 250),
   perKmRate: Number(process.env.PER_KM_RATE || 35),
@@ -39,7 +39,7 @@ const rewardPointsByPriority = {
 const demoRequests = [
   {
     id: 'demo-req-noida-critical',
-    patientId: 'walk-in-noida',
+    patientId: 'walk-in-mumbai',
     patientName: 'Neha Sharma',
     contact: '+91 98111 22334',
     driverId: null,
@@ -48,14 +48,14 @@ const demoRequests = [
     priority: 'Critical',
     distance: '6.2 km',
     eta: 5,
-    region: 'Noida Sector 18',
-    patientLocation: { lat: 28.5708, lng: 77.3261 },
-    driverLocation: { lat: 28.5865, lng: 77.2191 },
+    region: 'Dadar, Mumbai',
+    patientLocation: { lat: 19.017, lng: 72.847 },
+    driverLocation: { lat: 19.025, lng: 72.84 },
     createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString()
   },
   {
     id: 'demo-req-gurugram-moderate',
-    patientId: 'walk-in-gurugram',
+    patientId: 'walk-in-pune',
     patientName: 'Kabir Malhotra',
     contact: '+91 98990 77881',
     driverId: 'driver-profile-demo',
@@ -64,9 +64,9 @@ const demoRequests = [
     priority: 'Moderate',
     distance: '9.8 km',
     eta: 8,
-    region: 'Cyber Hub, Gurugram',
-    patientLocation: { lat: 28.495, lng: 77.089 },
-    driverLocation: { lat: 28.4595, lng: 77.0266 },
+    region: 'Shivajinagar, Pune',
+    patientLocation: { lat: 18.53, lng: 73.847 },
+    driverLocation: { lat: 18.536, lng: 73.878 },
     createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString()
   }
 ];
@@ -207,9 +207,13 @@ async function seedJson() {
     db.transactions = db.transactions || [];
     db.drivers = db.drivers.map((driver) => {
       const completed = driver.id === 'driver-profile-demo' ? Math.max(driver.completed || 0, 16) : driver.completed || 0;
-      return enrichDriver({ ...driver, location: driver.location || driverLocation, completed, completedRides: driver.completedRides ?? completed });
+      return enrichDriver({ ...driver, location: driver.id === 'driver-profile-demo' ? driverLocation : driver.location || driverLocation, vehicleNumber: driver.id === 'driver-profile-demo' ? 'MH 12 AM 2047' : driver.vehicleNumber, completed, completedRides: driver.completedRides ?? completed });
     });
     db.requests = db.requests.map(enrichRequest);
+    db.requests = db.requests.map((request) => {
+      const demo = demoRequests.find((item) => item.id === request.id);
+      return demo ? { ...request, patientId: demo.patientId, region: demo.region, patientLocation: demo.patientLocation, driverLocation: demo.driverLocation } : request;
+    });
     for (const request of demoRequests) {
       if (!db.requests.some((item) => item.id === request.id)) db.requests.push(request);
     }
@@ -227,8 +231,8 @@ async function seedJson() {
           id: 'driver-profile-demo',
           userId: 'driver-demo',
           name: 'Rohan Singh',
-          licenseNumber: 'DL-042026-AMB',
-          vehicleNumber: 'DL 01 AM 2047',
+          licenseNumber: 'MH-042026-AMB',
+          vehicleNumber: 'MH 12 AM 2047',
           phone: '+91 99887 76655',
           status: 'ONLINE',
           location: driverLocation,
@@ -393,7 +397,7 @@ export async function createRequest(payload) {
     priority: payload.priority,
     distance: payload.priority === 'Critical' ? '2.1 km' : '4.6 km',
     eta: priorityEta[payload.priority] || 8,
-    region: 'AIIMS - South Delhi corridor',
+    region: 'Pune, Maharashtra (demo dispatch area)',
     patientLocation,
     driverLocation,
     fare: null,
